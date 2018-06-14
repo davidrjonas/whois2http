@@ -33,8 +33,13 @@ type header struct {
 type headerFlags []header
 
 func (f *headerFlags) String() string {
-	return "string rep"
-	//return strings.Join((*f)[:], ",")
+	var flattened []string
+
+	for _, h := range *f {
+		flattened = append(flattened, fmt.Sprintf("%s: %s", h.name, h.value))
+	}
+
+	return strings.Join(flattened, ",")
 }
 
 func (f *headerFlags) Set(v string) error {
