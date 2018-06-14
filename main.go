@@ -171,8 +171,6 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 		req.Header.Add(h.name, h.value)
 	}
 
-	log.Printf("Fetching: %v", req)
-
 	resp, err := client.Do(req)
 	if err != nil {
 		conn.Write([]byte("Upstream query failed\r\n"))
@@ -183,7 +181,7 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 
 	if resp.StatusCode != 200 {
 		conn.Write([]byte("Invalid query\r\n"))
-		return fmt.Errorf("Respnose is not 200; code=%d", resp.StatusCode)
+		return fmt.Errorf("Response is not 200; code=%d", resp.StatusCode)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
