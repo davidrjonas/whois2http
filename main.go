@@ -182,7 +182,7 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 		return err
 	}
 
-	conn.Write(translateLineEndingPattern.ReplaceAll(body, []byte("\r\n")))
+	conn.Write(translateLineEndingPattern.ReplaceAll(body, []byte("$1\r\n")))
 	conn.Write([]byte("\r\n"))
 
 	return nil
