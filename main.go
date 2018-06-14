@@ -158,6 +158,11 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 	req, err := http.NewRequest("GET", url, nil)
 
 	for _, h := range s.headers {
+		// Go net/http does a weird thing with the Host header. It will use it
+		// in place of what the URL specifies. To get the more common effect of
+		// sending the Host header as the Host header along with the actual URL
+		// spcified it must be handled by setting the Host field of the
+		// request. Strange, I know.
 		if h.name == "Host" {
 			req.Host = h.value
 			continue
