@@ -22,7 +22,32 @@ var (
 	upstream                      = flag.String("upstream", "http://example.com:80/whois?format=plain&query={{query}}", "Upstream to which we should proxy")
 	commandPattern, _             = regexp.Compile("^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\\.[a-zA-Z]{2,}\\.?$")
 	translateLineEndingPattern, _ = regexp.Compile("([^\r])\n")
+	headerSplitPattern, _         = regexp.Compile(":\\s*")
 )
+
+type header struct {
+	name  string
+	value string
+}
+
+type headerFlags []header
+
+func (f *headerFlags) String() string {
+	return "string rep"
+	//return strings.Join((*f)[:], ",")
+}
+
+func (f *headerFlags) Set(v string) error {
+	nameValue := headerSplitPattern.Split(v, 2)
+
+	if len(nameValue) != 2 {
+		log.Fatalf("Invalid header value; %v", v)
+	}
+
+	*f = append(*f, header{name: nameValue[0], value: nameValue[1]})
+
+	return nil
+}
 
 func mustListen(laddr string) *net.TCPListener {
 	tcpaddr, err := net.ResolveTCPAddr("tcp", laddr)
@@ -42,6 +67,7 @@ func mustListen(laddr string) *net.TCPListener {
 type WhoisServer struct {
 	upstream      *url.URL
 	acceptTimeout time.Duration
+	headers       []header
 	stop          chan bool
 	done          chan bool
 }
@@ -122,7 +148,22 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 
 	// Query backend
 	url := strings.Replace(*upstream, "{{query}}", url.QueryEscape(domain), -1)
-	resp, err := http.Get(url)
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+
+	for _, h := range s.headers {
+		if h.name == "Host" {
+			req.Host = h.value
+			continue
+		}
+
+		req.Header.Add(h.name, h.value)
+	}
+
+	log.Printf("Fetching: %v", req)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		conn.Write([]byte("Upstream query failed\r\n"))
 		return err
@@ -148,11 +189,14 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 }
 
 func main() {
+	var headers headerFlags
+	flag.Var(&headers, "header", "Headers to add to the upstream HTTP request. May be used multiple times.")
 	flag.Parse()
 
 	whois := WhoisServer{
 		upstream:      parseUpstreamOpt(*upstream),
 		acceptTimeout: 10 * time.Millisecond,
+		headers:       headers,
 		stop:          make(chan bool),
 		done:          make(chan bool),
 	}

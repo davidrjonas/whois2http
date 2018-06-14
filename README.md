@@ -8,7 +8,7 @@ A whois to http proxy. It listens for whois connections then makes an http reque
 Usage
 -----
 
-     whois2http -l :43 -b http://example.com/whois?format=plain&query={{query}}
+     whois2http -listen :43 -header "X-Forwarded-Proto: whois" -upstream http://example.com/whois?format=plain&query={{query}}
 
 `{{query}}` will be replaced as many times as necessary with the value provided by the client, url encoded.
 
