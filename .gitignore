@@ -1,0 +1,7 @@
+whois2http
+main
+.DS_Store
+/bin
+/vendor
+/dist
+.*.swp
