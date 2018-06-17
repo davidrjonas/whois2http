@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -17,9 +18,15 @@ import (
 	"time"
 )
 
+import (
+	"github.com/ulule/limiter"
+	"github.com/ulule/limiter/drivers/store/memory"
+)
+
 var (
 	listen                        = flag.String("listen", ":43", "target")
 	upstream                      = flag.String("upstream", "http://example.com:80/whois?format=plain&query={{query}}", "Upstream to which we should proxy")
+	rate                          = flag.String("rate", "3-M", "Rate at which requests can be made in the format <count>-<period> where count is an integer and period is one of S, M, H for second, minute, or hour.")
 	commandPattern, _             = regexp.Compile("^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\\.[a-zA-Z]{2,}\\.?$")
 	translateLineEndingPattern, _ = regexp.Compile("([^\r])\n")
 	headerSplitPattern, _         = regexp.Compile(":\\s*")
@@ -73,6 +80,7 @@ type WhoisServer struct {
 	upstream      *url.URL
 	acceptTimeout time.Duration
 	headers       []header
+	limiter       *limiter.Limiter
 	stop          chan bool
 	done          chan bool
 }
@@ -133,7 +141,33 @@ OUTER:
 	s.done <- true
 }
 
+func (s *WhoisServer) shouldLimit(remoteAddr string) bool {
+
+	ip := remoteAddr[0:strings.LastIndex(remoteAddr, ":")]
+	ctx := context.Background()
+
+	var err error
+	var lctx limiter.Context
+
+	if lctx, err = s.limiter.Get(ctx, ip); err != nil {
+		log.Printf("error getting limit for ip; ip=%s, error=%v", ip, err)
+		return false
+	}
+
+	if lctx.Reached {
+		t := time.Unix(lctx.Reset, 0)
+		log.Printf("rate limit reached; ip=%s, reset=%s", ip, t.Format(time.RFC3339))
+	}
+
+	return lctx.Reached
+}
+
 func (s *WhoisServer) handler(conn net.Conn) error {
+	if s.shouldLimit(conn.RemoteAddr().String()) {
+		conn.Write([]byte("Rate limited\r\n"))
+		return nil
+	}
+
 	buf := bufio.NewReader(conn)
 	domain, err := buf.ReadString('\n')
 	if err != nil {
@@ -142,7 +176,7 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 
 	domain = strings.TrimRight(domain, "\r\n")
 
-	log.Printf("recevied query; query=%v", domain)
+	log.Printf("recevied query; query=%v, ip=%v", domain, conn.RemoteAddr().String())
 
 	// Validate
 	if !commandPattern.MatchString(domain) {
@@ -196,6 +230,16 @@ func (s *WhoisServer) handler(conn net.Conn) error {
 	return nil
 }
 
+func mustParseRate(rate string) (r limiter.Rate) {
+	var err error
+	if r, err = limiter.NewRateFromFormatted(rate); err != nil {
+		fmt.Println("Invalid rate")
+		os.Exit(1)
+	}
+
+	return r
+}
+
 func main() {
 	var headers headerFlags
 	flag.Var(&headers, "header", "Headers to add to the upstream HTTP request. May be used multiple times.")
@@ -205,6 +249,7 @@ func main() {
 		upstream:      parseUpstreamOpt(*upstream),
 		acceptTimeout: 10 * time.Millisecond,
 		headers:       headers,
+		limiter:       limiter.New(memory.NewStore(), mustParseRate(*rate)),
 		stop:          make(chan bool),
 		done:          make(chan bool),
 	}
