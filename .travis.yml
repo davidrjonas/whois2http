@@ -4,13 +4,14 @@ go:
 - "1.10"
 
 script:
-- GOOS=linux go build
+- GOOS=linux GOARCH=amd64 go build
+- mv whois2http whois2http-linux-amd64
 
 deploy:
   provider: releases
   api_key:
     secure: XY8FAoM/FCLKicR6m/Vn6KPLz3hQl3f7qdk80cTQcMezNoos1OxrCBd+6vs/Vzr0wZNYcGd9GVJ+dOh41+piAuUUpzBPrfJ/vBHfZTQlYwVX7Kzs4XJPxKxb+SgM36flaADFAEeYQkWNHAsuWUQ69GtRs0HmtekKfoNqBFEjZrDWUVlipZzz+4RSvZBkKbGp+/lyHuMyDZGug9A9D/9P+YI1y5jWXK+aDqT5bUxo2lH3gMCHytJEJSxe/mGguoxNKTVlsYCYtRRR+lH6jOPn5U6Uk9tWpUjsCxUgRwq7aTWnXVPkFK1tAufDOn19SQCDivDHw/uq6qRg66cQMWKRImJa/PH6idmGF/TfGHc4R1Xz8RbEMUUqtlrX2xABpHU5xf98SdALie5vaG8T2Du5kDCPYZiilaPY/8hB/0Yd2SLYMzqlLpeb0Z6BA/Qq6iDZRWHolB4VnWqD+Fx4zSTY//2i94kRgK5SIAW5UrJWOdz4De9DpE8vXBF2W2QrRn27QD65PwQ4zD4L8g/Lmsd/GbnqYjv7Ux8xaROhxBIiBoHfvJ6recs+cx5QObndY9lzgsBkOFNscWA+dOUkWdvejNSqWrChJqJZD+xT4hpGHRPnXRwxBOg/GGnAPeC44/s3V42ytARs7ZZZAIVKmw+wPPbvtGeakUlPT5zs39iv2F8=
-  file: whois2http
+  file: whois2http-linux-amd64
   skip_cleanup: true
   on:
     repo: davidrjonas/whois2http
